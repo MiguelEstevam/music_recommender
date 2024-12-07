@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 flex justify-center">
+    <div class="w-full max-w-4xl p-8 bg-gray-800 rounded-md shadow-md">
+        <h1 class="text-xl font-bold text-center text-green-500 mb-4">Recomendações Musicais</h1>
+        <form id="recommendForm" class="mb-6">
+            <fieldset>
+                <legend class="text-lg font-semibold mb-2">Selecione os usuários:</legend>
+                <div id="userList" class="space-y-2"></div>
+            </fieldset>
+            <button type="submit" class="w-full px-4 py-2 mt-4 bg-green-500 text-black rounded-md">Gerar Recomendações</button>
+        </form>
+        <div id="recommendations" class="space-y-4"></div>
+    </div>
+</div>
+
+<script>
+    // Carrega usuários na inicialização
+    async function loadUsers() {
+        const response = await fetch('/users');
+        const users = await response.json();
+        const userList = document.getElementById('userList');
+        userList.innerHTML = ''; // Limpa a lista antes de carregar
+
+        users.forEach(user => {
+            const label = document.createElement('label');
+            label.innerHTML = `
+                <input type="checkbox" name="users" value="${user.username}">
+                ${user.username} (Gosta de: ${user.styles.join(", ")})
+            `;
+            userList.appendChild(label);
+            userList.appendChild(document.createElement('br'));
+        });
+    }
+
+    document.getElementById('recommendForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const selectedUsers = formData.getAll('users');
+
+        if (selectedUsers.length < 2) {
+            alert("Selecione pelo menos dois usuários!");
+            return;
+        }
+
+        const response = await fetch('/recommend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ users: selectedUsers })
+        });
+
+        const recommendationsDiv = document.getElementById('recommendations');
+        recommendationsDiv.innerHTML = ''; // Limpa os resultados anteriores
+
+        if (response.ok) {
+            const recommendations = await response.json();
+            if (recommendations.length > 0) {
+                recommendations.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-700 p-4 rounded-md flex items-center space-x-4";
+                    card.innerHTML = `
+                        <img src="${item.album.images[0].url}" alt="${item.name}" class="w-16 h-16 rounded-md">
+                        <div>
+                            <a href="${item.external_urls.spotify}" target="_blank" class="text-green-500 font-bold">${item.name}</a>
+                            <p class="text-gray-300">Artista: ${item.artists.map(artist => artist.name).join(", ")}</p>
+                        </div>
+                    `;
+                    recommendationsDiv.appendChild(card);
+                });
+            } else {
+                recommendationsDiv.innerHTML = '<p class="text-gray-300">Nenhuma recomendação encontrada.</p>';
+            }
+        } else {
+            const error = await response.json();
+            recommendationsDiv.innerHTML = `<p class="text-red-500">Erro: ${error.error}</p>`;
+        }
+    });
+
+    // Carrega usuários ao carregar a página
+    window.onload = loadUsers;
+</script>
+{% endblock %}
